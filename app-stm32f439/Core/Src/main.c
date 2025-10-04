@@ -23,8 +23,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-/* For USB CDC */
 #include "log.h"
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -46,6 +46,8 @@
 osThreadId defaultTaskHandle;
 /* USER CODE BEGIN PV */
 LOG_MODULE_REGISTER("main", LOG_LEVEL_DBG);
+
+osThreadId mainTaskHandle;
 
 uint8_t au8_usb_buf[1024];
 /* USER CODE END PV */
@@ -190,18 +192,56 @@ void SystemClock_Config(void)
   */
 static void MX_GPIO_Init(void)
 {
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
 /* USER CODE BEGIN MX_GPIO_Init_1 */
 /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOH_CLK_ENABLE();
+  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(WDI_GPIO_Port, WDI_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : WDI_Pin */
+  GPIO_InitStruct.Pin = WDI_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(WDI_GPIO_Port, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
+static void vMainTask(void const * argument)
+{
+  v_log_init();
+  
+  //printf("logging initialized\r\n");
+  
+  osDelay(pdMS_TO_TICKS(1000));
+  LOG_INF("System init");
+  osDelay(pdMS_TO_TICKS(100));
+  LOG_WRN("Low battery: %d%%", 20);
+  osDelay(pdMS_TO_TICKS(100));
+  LOG_ERR("Fatal error: %d", -1);
+  osDelay(pdMS_TO_TICKS(100));
+  LOG_DBG("Debug value: 0x%X", 0x1234);
+  osDelay(pdMS_TO_TICKS(100));
+  
+  for (;;)
+  {
+    //printf("hiiiiiiii\r\n");
+    LOG_INF("Hello...");
+    osDelay(pdMS_TO_TICKS(1000));
+    
+    /* Toggle WDI pin to avoid reset */
+    HAL_GPIO_TogglePin(WDI_GPIO_Port, WDI_Pin);
+  }
+}
 
 /* USER CODE END 4 */
 
@@ -218,25 +258,33 @@ void StartDefaultTask(void const * argument)
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 5 */
   
-  v_log_init();
+  osThreadDef(mainTask, vMainTask, osPriorityNormal, 0, 2048);
+  mainTaskHandle = osThreadCreate(osThread(mainTask), NULL);
   
-  osDelay(pdMS_TO_TICKS(1000));
-  LOG_INF("System init");
-  osDelay(pdMS_TO_TICKS(100));
-  LOG_WRN("Low battery: %d%%", 20);
-  osDelay(pdMS_TO_TICKS(100));
-  LOG_ERR("Fatal error: %d", -1);
-  osDelay(pdMS_TO_TICKS(100));
-  LOG_DBG("Debug value: 0x%X", 0x1234);
-  osDelay(pdMS_TO_TICKS(100));
-  
-  /* Infinite loop */
-  for(;;)
-  {
-    LOG_INF("Hello...");
-    osDelay(pdMS_TO_TICKS(1000));
-  }
+  /* Self delete */
+  osThreadTerminate(NULL);
   /* USER CODE END 5 */
+}
+
+/**
+  * @brief  Period elapsed callback in non blocking mode
+  * @note   This function is called  when TIM1 interrupt took place, inside
+  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+  * a global variable "uwTick" used as application time base.
+  * @param  htim : TIM handle
+  * @retval None
+  */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  /* USER CODE BEGIN Callback 0 */
+
+  /* USER CODE END Callback 0 */
+  if (htim->Instance == TIM1) {
+    HAL_IncTick();
+  }
+  /* USER CODE BEGIN Callback 1 */
+
+  /* USER CODE END Callback 1 */
 }
 
 /**

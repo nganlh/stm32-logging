@@ -1,6 +1,5 @@
 #include "log.h"
 #include "cmsis_os.h"
-#include "bsp.h"
 
 #define LOG_QUEUE_LENGTH   16        // Number of messages
 #define LOG_BUFFER_SIZE    128       // Max size of each log
