@@ -1,3 +1,34 @@
+/**
+ * @file    log.h
+ * @brief   Logging framework for STM32 applications using CMSIS-RTOS.
+ *
+ * This module provides a lightweight and thread-safe logging system
+ * that supports multiple backends such as USB CDC, UART, SWO, or
+ * semihosting. It allows configurable log levels at both compile-time
+ * and per-module granularity.
+ *
+ * Features:
+ * - Thread-safe log queuing using FreeRTOS/CMSIS-RTOS queues
+ * - Colored output for terminal-based debugging
+ * - Hexdump logging macros for binary data inspection
+ * - Module-based log level control
+ * - Pluggable backend output (defined in v_bsp_log_output())
+ *
+ * Typical usage:
+ * @code
+ *   LOG_MODULE_REGISTER("SENSOR", LOG_LEVEL_DBG);
+ *   LOG_INF("Sensor initialized");
+ *   LOG_DBG("Value = %d", sensor_value);
+ *   LOG_HEXDUMP_DBG("RawData", data_buf, data_len);
+ * @endcode
+ *
+ * @note The output backend must be implemented in v_bsp_log_output().
+ * @note The log task is created by calling v_log_init() during system startup.
+ *
+ * @author  nganlh
+ * @date    2025
+ * @version 1.0
+ */
 #ifndef LOG_H__
 #define LOG_H__
 
@@ -30,7 +61,7 @@
 
 typedef uint8_t log_level_t;
   
-/* Public APIs */
+/* === Public APIs === */
 void v_log_init(void);
 void v_log_message(log_level_t level, const char *module, const char *fmt, ...);
 void v_log_hexdump(log_level_t level, const char *module,

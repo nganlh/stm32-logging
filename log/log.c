@@ -1,3 +1,38 @@
+/**
+ * @file    log.c
+ * @brief   Logging framework implementation for STM32 (CMSIS-RTOS based).
+ *
+ * This file implements a lightweight, thread-safe logging system that supports
+ * multiple output backends (e.g., USB CDC, UART, SWO, or semihosting) through
+ * the `v_bsp_log_output()` function.
+ *
+ * The logging system uses a dedicated FreeRTOS task and a queue to offload
+ * message formatting and output from the main application, preventing blocking
+ * in timing-sensitive threads.
+ *
+ * Features:
+ * - Thread-safe asynchronous logging using a queue
+ * - Timestamped log entries with color-coded level tags
+ * - Per-module log level control
+ * - Hexdump utility for binary data inspection
+ * - Configurable backend output
+ *
+ * Task structure:
+ * - The `v_log_task()` continuously dequeues formatted log messages and passes
+ *   them to the board-specific output function `v_bsp_log_output()`.
+ * - The log queue is initialized and the task is created by calling `v_log_init()`.
+ *
+ * @note To use this module, ensure that:
+ *       - `v_bsp_log_output()` is implemented in your BSP layer.
+ *       - `v_log_init()` is called once during system startup.
+ *       - `LOG_MAX_LEVEL` and backend are defined in `bsp.h`.
+ *
+ * @see log.h
+ *
+ * @author  nganlh
+ * @date    2025
+ * @version 1.0
+ */
 #include "log.h"
 #include "cmsis_os.h"
 
@@ -159,4 +194,3 @@ void v_log_init(void)
     xTaskCreate(v_log_task, "log_task", 128, NULL, tskIDLE_PRIORITY, NULL);
 #endif
 }
-
