@@ -47,6 +47,7 @@ osThreadId defaultTaskHandle;
 /* USER CODE BEGIN PV */
 LOG_MODULE_REGISTER("main", LOG_LEVEL_DBG);
 osThreadId mainTaskHandle;
+static uint8_t au8_buf[256];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -204,7 +205,40 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-
+void v_Main_Task(void const *arg)
+{
+  v_log_init();
+  
+  osDelay(pdMS_TO_TICKS(1000));
+  LOG_INF("System init");
+  osDelay(pdMS_TO_TICKS(100));
+  LOG_WRN("Low battery: %d%%", 20);
+  osDelay(pdMS_TO_TICKS(100));
+  LOG_ERR("Fatal error: %d", -1);
+  osDelay(pdMS_TO_TICKS(100));
+  LOG_DBG("Debug value: 0x%X", 0x1234);
+  osDelay(pdMS_TO_TICKS(100));
+  
+  for (uint32_t u32_i = 0; u32_i < sizeof(au8_buf); u32_i++)
+  {
+    au8_buf[u32_i] = u32_i & 0xFF;
+  }
+  LOG_HEXDUMP_DBG("buffer data", au8_buf, sizeof(au8_buf));
+  osDelay(pdMS_TO_TICKS(100));
+  LOG_HEXDUMP_INF("buffer data", au8_buf, sizeof(au8_buf));
+  osDelay(pdMS_TO_TICKS(100));
+  LOG_HEXDUMP_WRN("buffer data", au8_buf, sizeof(au8_buf));
+  osDelay(pdMS_TO_TICKS(100));
+  snprintf((char*)au8_buf, sizeof(au8_buf), "Error Message");
+  LOG_HEXDUMP_ERR("buffer data", au8_buf, strlen((char*)au8_buf));
+  osDelay(pdMS_TO_TICKS(100));
+  
+  for (;;)
+  {
+    LOG_INF("Hello...");
+    osDelay(pdMS_TO_TICKS(1000));
+  }
+}
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartDefaultTask */
@@ -219,23 +253,12 @@ void StartDefaultTask(void const * argument)
   /* init code for USB_DEVICE */
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 5 */
-  v_log_init();
   
-  osDelay(pdMS_TO_TICKS(1000));
-  LOG_INF("System init");
-  osDelay(pdMS_TO_TICKS(100));
-  LOG_WRN("Low battery: %d%%", 20);
-  osDelay(pdMS_TO_TICKS(100));
-  LOG_ERR("Fatal error: %d", -1);
-  osDelay(pdMS_TO_TICKS(100));
-  LOG_DBG("Debug value: 0x%X", 0x1234);
-  osDelay(pdMS_TO_TICKS(100));
+  osThreadDef(mainTask, v_Main_Task, osPriorityNormal, 0, 512);
+  mainTaskHandle = osThreadCreate(osThread(mainTask), NULL);
   
-  for (;;)
-  {
-    LOG_INF("Hello...");
-    osDelay(pdMS_TO_TICKS(1000));
-  }
+  /* Self delete */
+  osThreadTerminate(NULL);
   /* USER CODE END 5 */
 }
 

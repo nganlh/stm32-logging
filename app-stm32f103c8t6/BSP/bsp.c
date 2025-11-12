@@ -17,7 +17,7 @@
 #include "usart.h"  // Your HAL UART handle
 #endif
 
-void bsp_log_output(uint8_t *pu8_buf, uint16_t u16_len)
+void v_bsp_log_output(uint8_t *pu8_buf, uint16_t u16_len)
 {
 #ifdef BSP_LOG_BACKEND_USB
   // USB CDC output

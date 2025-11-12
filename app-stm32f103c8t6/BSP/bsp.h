@@ -12,6 +12,6 @@
 // #define LOG_MAX_LEVEL      LOG_LEVEL_ERR
 // #define LOG_DEFAULT_LEVEL  LOG_LEVEL_INF
 
-void bsp_log_output(uint8_t *pu8_buf, uint16_t u16_len);
+void v_bsp_log_output(uint8_t *pu8_buf, uint16_t u16_len);
 
 #endif /* BSP_H__ */

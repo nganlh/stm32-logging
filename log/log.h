@@ -33,6 +33,8 @@ typedef uint8_t log_level_t;
 /* Public APIs */
 void v_log_init(void);
 void v_log_message(log_level_t level, const char *module, const char *fmt, ...);
+void v_log_hexdump(log_level_t level, const char *module,
+                   const char *label, const uint8_t *data, uint16_t len);
 
 /* ================== LOG MACROS ================== */
 #if LOG_LEVEL_ERR <= LOG_MAX_LEVEL
@@ -73,6 +75,48 @@ void v_log_message(log_level_t level, const char *module, const char *fmt, ...);
   } while(0)
 #else
 #define LOG_DBG(...) do {} while(0)
+#endif
+  
+/* ================== HEXDUMP MACROS ================== */
+
+#if LOG_LEVEL_ERR <= LOG_MAX_LEVEL
+#define LOG_HEXDUMP_ERR(label, data, len) \
+  do { \
+    if ((LOG_MODULE_LEVEL >= LOG_LEVEL_ERR) && (LOG_LEVEL_ERR <= LOG_MAX_LEVEL)) \
+      v_log_hexdump(LOG_LEVEL_ERR, LOG_MODULE_NAME, label, data, len); \
+  } while(0)
+#else
+#define LOG_HEXDUMP_ERR(label, data, len) do {} while(0)
+#endif
+
+#if LOG_LEVEL_WRN <= LOG_MAX_LEVEL
+#define LOG_HEXDUMP_WRN(label, data, len) \
+  do { \
+    if ((LOG_MODULE_LEVEL >= LOG_LEVEL_WRN) && (LOG_LEVEL_WRN <= LOG_MAX_LEVEL)) \
+      v_log_hexdump(LOG_LEVEL_WRN, LOG_MODULE_NAME, label, data, len); \
+  } while(0)
+#else
+#define LOG_HEXDUMP_WRN(label, data, len) do {} while(0)
+#endif
+
+#if LOG_LEVEL_INF <= LOG_MAX_LEVEL
+#define LOG_HEXDUMP_INF(label, data, len) \
+  do { \
+    if ((LOG_MODULE_LEVEL >= LOG_LEVEL_INF) && (LOG_LEVEL_INF <= LOG_MAX_LEVEL)) \
+      v_log_hexdump(LOG_LEVEL_INF, LOG_MODULE_NAME, label, data, len); \
+  } while(0)
+#else
+#define LOG_HEXDUMP_INF(label, data, len) do {} while(0)
+#endif
+
+#if LOG_LEVEL_DBG <= LOG_MAX_LEVEL
+#define LOG_HEXDUMP_DBG(label, data, len) \
+  do { \
+    if ((LOG_MODULE_LEVEL >= LOG_LEVEL_DBG) && (LOG_LEVEL_DBG <= LOG_MAX_LEVEL)) \
+      v_log_hexdump(LOG_LEVEL_DBG, LOG_MODULE_NAME, label, data, len); \
+  } while(0)
+#else
+#define LOG_HEXDUMP_DBG(label, data, len) do {} while(0)
 #endif
 
 #endif /* LOG_H__ */

@@ -2,7 +2,7 @@
 #include "cmsis_os.h"
 
 #define LOG_QUEUE_LENGTH   16        // Number of messages
-#define LOG_BUFFER_SIZE    128       // Max size of each log
+#define LOG_BUFFER_SIZE    256       // Max size of each log
 
 #define LOG_COLOR_RED     "\033[0;31m"
 #define LOG_COLOR_GREEN   "\033[0;32m"
@@ -19,16 +19,6 @@ typedef struct
 } log_item_t;
 
 static QueueHandle_t logQueue;
-
-#if 0
-static void log_output(const char *level, const char *module,
-                       const char *fmt, va_list args)
-{
-  printf("[%s] %s: ", level, module);
-  vprintf(fmt, args);
-  printf("\r\n");
-}
-#endif
 
 static void v_log_output(log_level_t level, const char *module,
                          const char *fmt, va_list args)
@@ -98,6 +88,51 @@ void v_log_message(log_level_t level, const char *module, const char *fmt, ...)
   va_end(args);
 }
 
+void v_log_hexdump(log_level_t level, const char *module,
+                   const char *label, const uint8_t *data, uint16_t len)
+{
+    if (data == NULL || len == 0)
+        return;
+
+    char line[80];  // one line of hex dump
+    uint16_t offset = 0;
+
+    // print label first
+    v_log_message(level, module, "%s (len=%u):", label, len);
+
+    while (offset < len) {
+        int pos = 0;
+
+        // offset part
+        pos += snprintf(line + pos, sizeof(line) - pos, "%04X: ", offset);
+
+        // hex bytes part
+        for (uint16_t i = 0; i < 16 && (offset + i) < len; i++) {
+            pos += snprintf(line + pos, sizeof(line) - pos,
+                            "%02X ", data[offset + i]);
+        }
+
+        // fill spacing if last line shorter
+        for (uint16_t i = len - offset; i < 16; i++) {
+            if (i < 16)
+                pos += snprintf(line + pos, sizeof(line) - pos, "   ");
+        }
+
+        // ascii part
+        pos += snprintf(line + pos, sizeof(line) - pos, " |");
+        for (uint16_t i = 0; i < 16 && (offset + i) < len; i++) {
+            uint8_t c = data[offset + i];
+            line[pos++] = (c >= 32 && c <= 126) ? c : '.';
+        }
+        snprintf(line + pos, sizeof(line) - pos, "|");
+
+        // output the line
+        v_log_message(level, module, "%s", line);
+
+        offset += 16;
+    }
+}
+
 static void v_log_task(void *argument)
 {
   log_item_t item;
@@ -106,19 +141,22 @@ static void v_log_task(void *argument)
   {
     if (xQueueReceive(logQueue, &item, portMAX_DELAY) == pdPASS)
     {
-      bsp_log_output((uint8_t*)item.buf, item.len);
+      v_bsp_log_output((uint8_t*)item.buf, item.len);
     }
   }
 }
 
 void v_log_init(void)
 {
+#if LOG_MAX_LEVEL > LOG_LEVEL_OFF
     logQueue = xQueueCreate(LOG_QUEUE_LENGTH, sizeof(log_item_t));
-    if (logQueue == NULL) {
-        // Queue creation failed
-        Error_Handler();
-    }
+    configASSERT(logQueue);
+    //if (logQueue == NULL) {
+    //    // Queue creation failed
+    //    Error_Handler();
+    //}
 
-    xTaskCreate(v_log_task, "log_task", 256, NULL, osPriorityLow, NULL);
+    xTaskCreate(v_log_task, "log_task", 128, NULL, tskIDLE_PRIORITY, NULL);
+#endif
 }
 
