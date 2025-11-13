@@ -54,6 +54,7 @@ typedef struct
 } log_item_t;
 
 static QueueHandle_t logQueue;
+static volatile uint16_t u16_msg_drop_cntr = 0;
 
 static void v_log_output(log_level_t level, const char *module,
                          const char *fmt, va_list args)
@@ -112,7 +113,10 @@ static void v_log_output(log_level_t level, const char *module,
   item.len = len;
 
   // Enqueue (drop if queue full)
-  xQueueSend(logQueue, &item, 0);
+  if (xQueueSend(logQueue, &item, 0) != pdPASS)
+  {
+    u16_msg_drop_cntr++;
+  }
 }
 
 void v_log_message(log_level_t level, const char *module, const char *fmt, ...)
@@ -171,12 +175,26 @@ void v_log_hexdump(log_level_t level, const char *module,
 static void v_log_task(void *argument)
 {
   log_item_t item;
+  uint16_t u16_last_drop_cntr = 0;
 
   for (;;)
   {
-    if (xQueueReceive(logQueue, &item, portMAX_DELAY) == pdPASS)
+    if (xQueueReceive(logQueue, &item, pdMS_TO_TICKS(1000)) == pdPASS)
     {
       v_bsp_log_output((uint8_t*)item.buf, item.len);
+    }
+    
+    if (u16_msg_drop_cntr != u16_last_drop_cntr)
+    {
+      char buf[37];
+      int len = snprintf(
+        buf, sizeof(buf),
+        "%s[LOG] %lu messages dropped!\r\n",
+        LOG_COLOR_RED,
+        (unsigned long)(u16_msg_drop_cntr - u16_last_drop_cntr)
+      );
+      v_bsp_log_output((uint8_t*)buf, len);
+      u16_last_drop_cntr = u16_msg_drop_cntr;
     }
   }
 }

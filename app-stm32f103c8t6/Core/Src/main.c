@@ -224,6 +224,12 @@ void v_Main_Task(void const *arg)
     au8_buf[u32_i] = u32_i & 0xFF;
   }
   LOG_HEXDUMP_DBG("buffer data", au8_buf, sizeof(au8_buf));
+  LOG_HEXDUMP_INF("buffer data", au8_buf, sizeof(au8_buf));
+  LOG_HEXDUMP_WRN("buffer data", au8_buf, sizeof(au8_buf));
+  LOG_HEXDUMP_ERR("buffer data", au8_buf, strlen((char*)au8_buf));
+  osDelay(pdMS_TO_TICKS(100));
+  
+  LOG_HEXDUMP_DBG("buffer data", au8_buf, sizeof(au8_buf));
   osDelay(pdMS_TO_TICKS(100));
   LOG_HEXDUMP_INF("buffer data", au8_buf, sizeof(au8_buf));
   osDelay(pdMS_TO_TICKS(100));
