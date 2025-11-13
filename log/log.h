@@ -27,7 +27,7 @@
  *
  * @author  nganlh
  * @date    2025
- * @version 1.0
+ * @version 1.1
  */
 #ifndef LOG_H__
 #define LOG_H__
