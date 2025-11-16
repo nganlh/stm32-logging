@@ -135,7 +135,7 @@ static uint16_t circbuf_pop(uint8_t *pu8_out)
 static void v_log_format_and_push(log_level_t level, const char *pc_tag,
                                   const char *pc_fmt, va_list args)
 {
-  //char au8_tmp[LOG_ITEM_MAX_SIZE];
+  //uint8_t au8_tmp[LOG_ITEM_MAX_SIZE];
   uint16_t u16_len = 0;
 
   // Timestamp
@@ -146,24 +146,24 @@ static void v_log_format_and_push(log_level_t level, const char *pc_tag,
   uint32_t u32_hour = (u32_tick / 3600000);
 
   const char *pc_color = LOG_COLOR_RESET;
-  const char *pc_level_str = "UNK";
+  const char *pc_level_str = "*";
   switch (level)
   {
   case LOG_LEVEL_ERR:
     pc_color = LOG_COLOR_RED;
-    pc_level_str = "ERR"; 
+    pc_level_str = "E";
     break;
   case LOG_LEVEL_WRN:
     pc_color = LOG_COLOR_YELLOW;
-    pc_level_str = "WRN";
+    pc_level_str = "W";
     break;
   case LOG_LEVEL_INF:
     //pc_color = LOG_COLOR_RESET;
-    pc_level_str = "INF";
+    pc_level_str = "I";
     break;
   case LOG_LEVEL_DBG:
     pc_color = LOG_COLOR_CYAN;
-    pc_level_str = "DBG";
+    pc_level_str = "D";
     break;
   }
 
