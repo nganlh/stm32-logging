@@ -61,124 +61,133 @@ static log_circbuf_t log_buf;
 static SemaphoreHandle_t log_mutex;
 static SemaphoreHandle_t log_sem;
 
-uint8_t tmp_buf[LOG_ITEM_MAX_SIZE];
+uint8_t au8_tmp[LOG_ITEM_MAX_SIZE];
 static volatile uint16_t u16_msg_drop_cntr = 0;
 
-static void circbuf_push(const uint8_t *data, uint16_t len)
+static void circbuf_push(const uint8_t *pu8_data, uint16_t u16_len)
 {
-  if (len > LOG_ITEM_MAX_SIZE)
+  if (u16_len > LOG_ITEM_MAX_SIZE)
   {
-    len = LOG_ITEM_MAX_SIZE;
+    u16_len = LOG_ITEM_MAX_SIZE;
   }
 
   xSemaphoreTake(log_mutex, portMAX_DELAY);
 
   // Check for available space (need len + 2 bytes for length info)
-  uint16_t needed = len + 2;
-  if (LOG_BUF_TOTAL_SIZE - log_buf.count < needed) {
+  uint16_t u16_needed = u16_len + 2;
+  if (LOG_BUF_TOTAL_SIZE - log_buf.count < u16_needed)
+  {
     u16_msg_drop_cntr++;
     xSemaphoreGive(log_mutex);
     return;
   }
 
   // Write length (2 bytes, little-endian)
-  log_buf.buffer[log_buf.head++] = (uint8_t)(len & 0xFF);
+  log_buf.buffer[log_buf.head++] = (uint8_t)(u16_len & 0xFF);
   log_buf.head %= LOG_BUF_TOTAL_SIZE;
-  log_buf.buffer[log_buf.head++] = (uint8_t)(len >> 8);
+  log_buf.buffer[log_buf.head++] = (uint8_t)(u16_len >> 8);
   log_buf.head %= LOG_BUF_TOTAL_SIZE;
 
   // Write message bytes
-  for (uint16_t i = 0; i < len; i++) {
-    log_buf.buffer[log_buf.head++] = data[i];
+  for (uint16_t u16_i = 0; u16_i < u16_len; u16_i++)
+  {
+    log_buf.buffer[log_buf.head++] = pu8_data[u16_i];
     log_buf.head %= LOG_BUF_TOTAL_SIZE;
   }
 
-  log_buf.count += needed;
+  log_buf.count += u16_needed;
 
   xSemaphoreGive(log_mutex);
   xSemaphoreGive(log_sem); // signal that data is available
 }
 
-static uint16_t circbuf_pop(uint8_t *out)
+static uint16_t circbuf_pop(uint8_t *pu8_out)
 {
   xSemaphoreTake(log_mutex, portMAX_DELAY);
 
-  if (log_buf.count < 2) {
+  if (log_buf.count < 2)
+  {
     xSemaphoreGive(log_mutex);
     return 0;
   }
 
-  uint16_t len = log_buf.buffer[log_buf.tail++];
+  uint16_t u16_len = log_buf.buffer[log_buf.tail++];
   log_buf.tail %= LOG_BUF_TOTAL_SIZE;
-  len |= ((uint16_t)log_buf.buffer[log_buf.tail++] << 8);
+  u16_len |= ((uint16_t)log_buf.buffer[log_buf.tail++] << 8);
   log_buf.tail %= LOG_BUF_TOTAL_SIZE;
 
-  if (len > LOG_ITEM_MAX_SIZE)
+  if (u16_len > LOG_ITEM_MAX_SIZE)
   {
-    len = LOG_ITEM_MAX_SIZE;
+    u16_len = LOG_ITEM_MAX_SIZE;
   }
 
-  for (uint16_t i = 0; i < len; i++) {
-    out[i] = log_buf.buffer[log_buf.tail++];
+  for (uint16_t u16_i = 0; u16_i < u16_len; u16_i++)
+  {
+    pu8_out[u16_i] = log_buf.buffer[log_buf.tail++];
     log_buf.tail %= LOG_BUF_TOTAL_SIZE;
   }
 
-  log_buf.count -= (len + 2);
+  log_buf.count -= (u16_len + 2);
   xSemaphoreGive(log_mutex);
-  return len;
+  return u16_len;
 }
 
-static void v_log_format_and_push(log_level_t level, const char *module,
-                                  const char *fmt, va_list args)
+static void v_log_format_and_push(log_level_t level, const char *pc_tag,
+                                  const char *pc_fmt, va_list args)
 {
-  //char tmp_buf[LOG_ITEM_MAX_SIZE];
-  int len = 0;
+  //char au8_tmp[LOG_ITEM_MAX_SIZE];
+  uint16_t u16_len = 0;
 
   // Timestamp
-  uint32_t tick = xTaskGetTickCount() * portTICK_PERIOD_MS;
-  uint32_t ms   = tick % 1000;
-  uint32_t sec  = (tick / 1000) % 60;
-  uint32_t min  = (tick / 60000) % 60;
-  uint32_t hour = (tick / 3600000);
+  uint32_t u32_tick = xTaskGetTickCount() * portTICK_PERIOD_MS;
+  uint32_t u32_ms   = u32_tick % 1000;
+  uint32_t u32_sec  = (u32_tick / 1000) % 60;
+  uint32_t u32_min  = (u32_tick / 60000) % 60;
+  uint32_t u32_hour = (u32_tick / 3600000);
 
-  const char *color = LOG_COLOR_RESET;
-  const char *lvl = "UNK";
+  const char *pc_color = LOG_COLOR_RESET;
+  const char *pc_level_str = "UNK";
   switch (level)
   {
   case LOG_LEVEL_ERR:
-    color = LOG_COLOR_RED;
-    lvl = "ERR"; 
+    pc_color = LOG_COLOR_RED;
+    pc_level_str = "ERR"; 
     break;
   case LOG_LEVEL_WRN:
-    color = LOG_COLOR_YELLOW;
-    lvl = "WRN";
+    pc_color = LOG_COLOR_YELLOW;
+    pc_level_str = "WRN";
     break;
   case LOG_LEVEL_INF:
-    //color = LOG_COLOR_RESET;
-    lvl = "INF";
+    //pc_color = LOG_COLOR_RESET;
+    pc_level_str = "INF";
     break;
   case LOG_LEVEL_DBG:
-    color = LOG_COLOR_CYAN;
-    lvl = "DBG";
+    pc_color = LOG_COLOR_CYAN;
+    pc_level_str = "DBG";
     break;
   }
 
-  len = snprintf((char*)tmp_buf, sizeof(tmp_buf),
-                 "%s[%02u:%02u:%02u.%03u] [%s] %s: ",
-                 color, hour, min, sec, ms, lvl, module);
+  u16_len = snprintf(
+    (char*)au8_tmp, sizeof(au8_tmp),
+    "%s[%02u:%02u:%02u.%03u] [%s] %s: ",
+    pc_color, u32_hour, u32_min, u32_sec, u32_ms, pc_level_str, pc_tag
+  );
 
-  len += vsnprintf((char*)tmp_buf + len, sizeof(tmp_buf) - len, fmt, args);
-  len += snprintf((char*)tmp_buf + len, sizeof(tmp_buf) - len,
-                  "%s\r\n", LOG_COLOR_RESET);
-  if (len > LOG_ITEM_MAX_SIZE)
+  u16_len += vsnprintf((char*)au8_tmp + u16_len,
+                       sizeof(au8_tmp) - u16_len, pc_fmt, args);
+
+  u16_len += snprintf((char*)au8_tmp + u16_len, sizeof(au8_tmp) - u16_len,
+                      "%s\r\n", LOG_COLOR_RESET);
+
+  if (u16_len > LOG_ITEM_MAX_SIZE)
   {
-    len = LOG_ITEM_MAX_SIZE;
+    u16_len = LOG_ITEM_MAX_SIZE;
   }
 
-  circbuf_push(tmp_buf, (uint16_t)len);
+  circbuf_push(au8_tmp, u16_len);
 }
 
-void v_log_message(log_level_t level, const char *module, const char *fmt, ...)
+void v_log_message(log_level_t level, const char *pc_tag, const char *pc_fmt, ...)
 {
 #if LOG_MAX_LEVEL >= LOG_LEVEL_ERR
   if (xPortIsInsideInterrupt())
@@ -186,17 +195,17 @@ void v_log_message(log_level_t level, const char *module, const char *fmt, ...)
     return; // ignore log from ISR
   }
   va_list args;
-  va_start(args, fmt);
-  v_log_format_and_push(level, module, fmt, args);
+  va_start(args, pc_fmt);
+  v_log_format_and_push(level, pc_tag, pc_fmt, args);
   va_end(args);
 #endif
 }
 
-void v_log_hexdump(log_level_t level, const char *module,
-                   const char *label, const uint8_t *data, uint16_t len)
+void v_log_hexdump(log_level_t level, const char *pc_tag,
+                   const char *pc_label, const uint8_t *pu8_data, uint16_t u16_len)
 {
 #if LOG_MAX_LEVEL >= LOG_LEVEL_ERR
-  if (data == NULL || len == 0)
+  if (pu8_data == NULL || u16_len == 0)
   {
     return;
   }
@@ -205,55 +214,55 @@ void v_log_hexdump(log_level_t level, const char *module,
     return; // ignore log from ISR
   }
 
-  char line[80];  // one line of hex dump
-  uint16_t offset = 0;
+  char ac_line[80];  // one line of hex dump
+  uint16_t u16_offset = 0;
 
   // print label first
-  v_log_message(level, module, "%s (len=%u):", label, len);
+  v_log_message(level, pc_tag, "%s (len=%u):", pc_label, u16_len);
 
-  while (offset < len)
+  while (u16_offset < u16_len)
   {
     int pos = 0;
 
     // offset part
-    pos += snprintf(line + pos, sizeof(line) - pos, "%04X: ", offset);
+    pos += snprintf(ac_line + pos, sizeof(ac_line) - pos, "%04X: ", u16_offset);
 
     // hex bytes part
-    for (uint16_t i = 0; i < 16 && (offset + i) < len; i++)
+    for (uint16_t u16_i = 0; u16_i < 16 && (u16_offset + u16_i) < u16_len; u16_i++)
     {
-      pos += snprintf(line + pos, sizeof(line) - pos,
-                      "%02X ", data[offset + i]);
+      pos += snprintf(ac_line + pos, sizeof(ac_line) - pos,
+                      "%02X ", pu8_data[u16_offset + u16_i]);
     }
 
     // fill spacing if last line shorter
-    for (uint16_t i = len - offset; i < 16; i++)
+    for (uint16_t u16_i = u16_len - u16_offset; u16_i < 16; u16_i++)
     {
-      if (i < 16)
+      if (u16_i < 16)
       {
-        pos += snprintf(line + pos, sizeof(line) - pos, "   ");
+        pos += snprintf(ac_line + pos, sizeof(ac_line) - pos, "   ");
       }
     }
 
     // ascii part
-    pos += snprintf(line + pos, sizeof(line) - pos, " |");
-    for (uint16_t i = 0; i < 16 && (offset + i) < len; i++)
+    pos += snprintf(ac_line + pos, sizeof(ac_line) - pos, " |");
+    for (uint16_t i = 0; i < 16 && (u16_offset + i) < u16_len; i++)
     {
-      uint8_t c = data[offset + i];
-      line[pos++] = (c >= 32 && c <= 126) ? c : '.';
+      uint8_t c = pu8_data[u16_offset + i];
+      ac_line[pos++] = (c >= 32 && c <= 126) ? c : '.';
     }
-    snprintf(line + pos, sizeof(line) - pos, "|");
+    snprintf(ac_line + pos, sizeof(ac_line) - pos, "|");
 
     // output the line
-    v_log_message(level, module, "%s", line);
+    v_log_message(level, pc_tag, "%s", ac_line);
 
-    offset += 16;
+    u16_offset += 16;
   }
 #endif
 }
 
-static void v_log_task(void *argument)
+static void v_log_task(void *pv_argument)
 {
-  //uint8_t tmp_buf[LOG_ITEM_MAX_SIZE];
+  //uint8_t au8_tmp[LOG_ITEM_MAX_SIZE];
   uint16_t u16_last_drop_cntr = 0;
 
   for (;;)
@@ -263,21 +272,21 @@ static void v_log_task(void *argument)
     
     /* Drain all available messages before sleeping again */
     uint16_t u16_len;
-    while ((u16_len = circbuf_pop(tmp_buf)) > 0)
+    while ((u16_len = circbuf_pop(au8_tmp)) > 0)
     {
-      v_bsp_log_output(tmp_buf, u16_len);
+      v_bsp_log_output(au8_tmp, u16_len);
     }
     
     /* Drop count reporting */
     if (u16_msg_drop_cntr != u16_last_drop_cntr)
     {
-      int len = snprintf(
-        (char*)tmp_buf, sizeof(tmp_buf),
-        "%s[LOG] %lu messages dropped!\r\n",
+      uint16_t u16_len = snprintf(
+        (char*)au8_tmp, sizeof(au8_tmp),
+        "%s[LOG] %u messages dropped!\r\n",
         LOG_COLOR_RED,
-        (unsigned long)(u16_msg_drop_cntr - u16_last_drop_cntr)
+        u16_msg_drop_cntr - u16_last_drop_cntr
       );
-      v_bsp_log_output(tmp_buf, len);
+      v_bsp_log_output(au8_tmp, u16_len);
       u16_last_drop_cntr = u16_msg_drop_cntr;
     }
   }
