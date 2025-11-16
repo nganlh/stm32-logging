@@ -62,7 +62,7 @@ static log_circbuf_t log_buf;
 static SemaphoreHandle_t log_mutex;
 static SemaphoreHandle_t log_sem;
 
-//uint8_t au8_tmp[LOG_ITEM_MAX_SIZE];
+uint8_t au8_tmp[LOG_ITEM_MAX_SIZE];
 static volatile uint16_t u16_msg_drop_cntr = 0;
 
 static void circbuf_push(const uint8_t *pu8_data, uint16_t u16_len)
@@ -72,7 +72,7 @@ static void circbuf_push(const uint8_t *pu8_data, uint16_t u16_len)
     u16_len = LOG_ITEM_MAX_SIZE;
   }
 
-  xSemaphoreTake(log_mutex, portMAX_DELAY);
+  //xSemaphoreTake(log_mutex, portMAX_DELAY);
 
   // Check for available space (need len + 2 bytes for length info)
   uint16_t u16_needed = u16_len + 2;
@@ -98,8 +98,8 @@ static void circbuf_push(const uint8_t *pu8_data, uint16_t u16_len)
 
   log_buf.count += u16_needed;
 
-  xSemaphoreGive(log_mutex);
-  xSemaphoreGive(log_sem); // signal that data is available
+  //xSemaphoreGive(log_mutex);
+  //xSemaphoreGive(log_sem); // signal that data is available
 }
 
 static uint16_t circbuf_pop(uint8_t *pu8_out)
@@ -136,7 +136,7 @@ static uint16_t circbuf_pop(uint8_t *pu8_out)
 static void v_log_format_and_push(log_level_t level, const char *pc_tag,
                                   const char *pc_fmt, va_list args)
 {
-  uint8_t au8_tmp[LOG_ITEM_MAX_SIZE];
+  //uint8_t au8_tmp[LOG_ITEM_MAX_SIZE];
   uint16_t u16_len = 0;
 
   // Timestamp
@@ -168,6 +168,9 @@ static void v_log_format_and_push(log_level_t level, const char *pc_tag,
     break;
   }
 
+  /* Lock mutex before accessing share buffers: au8_tmp & circbuf */
+  xSemaphoreTake(log_mutex, portMAX_DELAY);
+  
   u16_len = snprintf(
     (char*)au8_tmp, sizeof(au8_tmp),
     "%s[%02u:%02u:%02u.%03u] [%s] %s: ",
@@ -187,6 +190,8 @@ static void v_log_format_and_push(log_level_t level, const char *pc_tag,
   }
 
   circbuf_push(au8_tmp, u16_len);
+  xSemaphoreGive(log_mutex);
+  xSemaphoreGive(log_sem); // signal that data is available
 }
 
 void v_log_message(log_level_t level, const char *pc_tag, const char *pc_fmt, ...)
@@ -264,7 +269,7 @@ void v_log_hexdump(log_level_t level, const char *pc_tag,
 
 static void v_log_task(void *pv_argument)
 {
-  uint8_t au8_tmp[LOG_ITEM_MAX_SIZE];
+  uint8_t au8_buf[LOG_ITEM_MAX_SIZE];
   uint16_t u16_last_drop_cntr = 0;
 
   for (;;)
@@ -274,22 +279,22 @@ static void v_log_task(void *pv_argument)
     
     /* Drain all available messages before sleeping again */
     uint16_t u16_len;
-    while ((u16_len = circbuf_pop(au8_tmp)) > 0)
+    while ((u16_len = circbuf_pop(au8_buf)) > 0)
     {
-      au8_tmp[u16_len] = 0;
-      v_bsp_log_output(au8_tmp, u16_len);
+      au8_buf[u16_len] = 0;
+      v_bsp_log_output(au8_buf, u16_len);
     }
     
     /* Drop count reporting */
     if (u16_msg_drop_cntr != u16_last_drop_cntr)
     {
       uint16_t u16_len = snprintf(
-        (char*)au8_tmp, sizeof(au8_tmp),
+        (char*)au8_buf, sizeof(au8_buf),
         "%s[LOG] %u messages dropped!\r\n",
         LOG_COLOR_RED,
         u16_msg_drop_cntr - u16_last_drop_cntr
       );
-      v_bsp_log_output(au8_tmp, u16_len);
+      v_bsp_log_output(au8_buf, u16_len);
       u16_last_drop_cntr = u16_msg_drop_cntr;
     }
   }
@@ -304,7 +309,7 @@ void v_log_init(void)
   configASSERT(log_mutex);
   configASSERT(log_sem);
   
-  xTaskCreate(v_log_task, "logTask", 128,
+  xTaskCreate(v_log_task, "log", 128,
               NULL, tskIDLE_PRIORITY, &log_task_handle);
 #endif
 }
