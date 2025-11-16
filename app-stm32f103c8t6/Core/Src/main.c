@@ -207,7 +207,10 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void v_Main_Task(void const *arg)
 {
+  static volatile UBaseType_t watermark;
+  
   v_log_init();
+  TaskHandle_t log_task = x_log_get_task_handle();
   
   osDelay(pdMS_TO_TICKS(1000));
   LOG_INF("System init");
@@ -241,7 +244,16 @@ void v_Main_Task(void const *arg)
   
   for (;;)
   {
-    LOG_INF("Hello...");
+    //LOG_INF("Hello...");
+    
+    watermark = uxTaskGetStackHighWaterMark(NULL);
+    LOG_INF("Task %s free stack: %lu words",
+            pcTaskGetName(NULL), (unsigned long)watermark);
+    
+    watermark = uxTaskGetStackHighWaterMark(log_task);
+    LOG_INF("Task %s free stack: %lu words",
+            pcTaskGetName(log_task), (unsigned long)watermark);
+    
     osDelay(pdMS_TO_TICKS(1000));
   }
 }

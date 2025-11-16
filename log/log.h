@@ -66,6 +66,7 @@ void v_log_init(void);
 void v_log_message(log_level_t level, const char *module, const char *fmt, ...);
 void v_log_hexdump(log_level_t level, const char *module,
                    const char *label, const uint8_t *data, uint16_t len);
+TaskHandle_t x_log_get_task_handle(void);
 
 /* ================== LOG MACROS ================== */
 #if LOG_LEVEL_ERR <= LOG_MAX_LEVEL

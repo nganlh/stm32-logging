@@ -57,11 +57,12 @@ typedef struct {
   uint16_t count;   // used bytes
 } log_circbuf_t;
 
+static TaskHandle_t log_task_handle;
 static log_circbuf_t log_buf;
 static SemaphoreHandle_t log_mutex;
 static SemaphoreHandle_t log_sem;
 
-uint8_t au8_tmp[LOG_ITEM_MAX_SIZE];
+//uint8_t au8_tmp[LOG_ITEM_MAX_SIZE];
 static volatile uint16_t u16_msg_drop_cntr = 0;
 
 static void circbuf_push(const uint8_t *pu8_data, uint16_t u16_len)
@@ -116,9 +117,9 @@ static uint16_t circbuf_pop(uint8_t *pu8_out)
   u16_len |= ((uint16_t)log_buf.buffer[log_buf.tail++] << 8);
   log_buf.tail %= LOG_BUF_TOTAL_SIZE;
 
-  if (u16_len > LOG_ITEM_MAX_SIZE)
+  if (u16_len > LOG_ITEM_MAX_SIZE - 1)
   {
-    u16_len = LOG_ITEM_MAX_SIZE;
+    u16_len = LOG_ITEM_MAX_SIZE - 1;
   }
 
   for (uint16_t u16_i = 0; u16_i < u16_len; u16_i++)
@@ -135,7 +136,7 @@ static uint16_t circbuf_pop(uint8_t *pu8_out)
 static void v_log_format_and_push(log_level_t level, const char *pc_tag,
                                   const char *pc_fmt, va_list args)
 {
-  //uint8_t au8_tmp[LOG_ITEM_MAX_SIZE];
+  uint8_t au8_tmp[LOG_ITEM_MAX_SIZE];
   uint16_t u16_len = 0;
 
   // Timestamp
@@ -176,12 +177,13 @@ static void v_log_format_and_push(log_level_t level, const char *pc_tag,
   u16_len += vsnprintf((char*)au8_tmp + u16_len,
                        sizeof(au8_tmp) - u16_len, pc_fmt, args);
 
-  u16_len += snprintf((char*)au8_tmp + u16_len, sizeof(au8_tmp) - u16_len,
-                      "%s\r\n", LOG_COLOR_RESET);
+  //u16_len += snprintf((char*)au8_tmp + u16_len, sizeof(au8_tmp) - u16_len,
+  //                    "%s\r\n", LOG_COLOR_RESET);
+  u16_len += snprintf((char*)au8_tmp + u16_len, sizeof(au8_tmp) - u16_len, "\r\n");
 
-  if (u16_len > LOG_ITEM_MAX_SIZE)
+  if (u16_len > LOG_ITEM_MAX_SIZE - 1)
   {
-    u16_len = LOG_ITEM_MAX_SIZE;
+    u16_len = LOG_ITEM_MAX_SIZE - 1;
   }
 
   circbuf_push(au8_tmp, u16_len);
@@ -262,7 +264,7 @@ void v_log_hexdump(log_level_t level, const char *pc_tag,
 
 static void v_log_task(void *pv_argument)
 {
-  //uint8_t au8_tmp[LOG_ITEM_MAX_SIZE];
+  uint8_t au8_tmp[LOG_ITEM_MAX_SIZE];
   uint16_t u16_last_drop_cntr = 0;
 
   for (;;)
@@ -274,6 +276,7 @@ static void v_log_task(void *pv_argument)
     uint16_t u16_len;
     while ((u16_len = circbuf_pop(au8_tmp)) > 0)
     {
+      au8_tmp[u16_len] = 0;
       v_bsp_log_output(au8_tmp, u16_len);
     }
     
@@ -300,7 +303,13 @@ void v_log_init(void)
   log_sem   = xSemaphoreCreateBinary();
   configASSERT(log_mutex);
   configASSERT(log_sem);
-
-  xTaskCreate(v_log_task, "log_task", 128, NULL, tskIDLE_PRIORITY, NULL);
+  
+  xTaskCreate(v_log_task, "logTask", 128,
+              NULL, tskIDLE_PRIORITY, &log_task_handle);
 #endif
+}
+
+TaskHandle_t x_log_get_task_handle(void)
+{
+  return log_task_handle;
 }

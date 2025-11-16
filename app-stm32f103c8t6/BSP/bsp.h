@@ -2,6 +2,7 @@
 #define BSP_H__
 
 #include <stdint.h>
+#include "cmsis_os.h"
 
 // Choose log backend here
 #define BSP_LOG_BACKEND_USB
